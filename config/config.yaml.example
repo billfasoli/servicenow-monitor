@@ -1,0 +1,56 @@
+# ServiceNow Monitor Configuration
+
+# Claude AI Settings
+claude:
+  api_key: "your-claude-api-key-here"
+  model: "claude-sonnet-4-5-20250929"
+  max_tokens: 4000
+
+# Company to monitor
+company:
+  name: "ServiceNow"
+  ticker: "NOW"  # For SEC filings
+  cik: "0001373715"  # SEC Central Index Key
+
+# Data Sources
+sources:
+  sec_filings:
+    enabled: true
+    types: ["10-K", "10-Q", "8-K"]
+
+  news:
+    enabled: true
+    # Get your API key from: https://newsapi.org/
+    api_key: "your-newsapi-key-here"
+    keywords: ["ServiceNow", "NOW stock"]
+
+  press_releases:
+    enabled: true
+    rss_url: "https://www.servicenow.com/company/media/press-room.html"
+
+# Output Settings
+output:
+  email:
+    enabled: false
+    smtp_server: "smtp.gmail.com"
+    smtp_port: 587
+    from_address: "your-email@example.com"
+    to_address: "your-email@example.com"
+    password: "your-app-password"
+
+  html_dashboard:
+    enabled: true
+    output_path: "data/dashboard.html"
+
+# Scheduling
+schedule:
+  frequency: "daily"  # daily, weekly, hourly
+  time: "09:00"  # Time to run (24-hour format)
+
+# Microsoft Graph (for internal documents - optional)
+microsoft_graph:
+  enabled: false
+  tenant_id: "your-tenant-id"
+  client_id: "your-client-id"
+  client_secret: "your-client-secret"
+  search_keywords: ["ServiceNow", "company update"]
