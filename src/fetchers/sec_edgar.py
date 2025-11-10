@@ -9,6 +9,7 @@ import time
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional
 import logging
+from bs4 import BeautifulSoup
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -152,6 +153,58 @@ class SECEdgarFetcher:
             "viewer_url": url,
             "company": self.company_name
         }
+
+    def fetch_filing_content(self, filing_url: str, max_length: int = 100000) -> Optional[str]:
+        """
+        Fetch the actual text content of a filing from its URL.
+
+        Args:
+            filing_url: URL of the filing document
+            max_length: Maximum length of content to return (to avoid huge documents)
+
+        Returns:
+            Text content of the filing, or None if fetch fails
+        """
+        try:
+            # Rate limiting
+            time.sleep(0.1)
+
+            # Update headers for SEC website
+            headers = {
+                "User-Agent": f"{self.company_name} Monitor Tool",
+                "Accept-Encoding": "gzip, deflate"
+            }
+
+            logger.info(f"Fetching filing content from {filing_url}")
+            response = requests.get(filing_url, headers=headers, timeout=30)
+            response.raise_for_status()
+
+            # Parse HTML content
+            soup = BeautifulSoup(response.text, 'html.parser')
+
+            # Remove script and style elements
+            for script in soup(["script", "style"]):
+                script.decompose()
+
+            # Get text
+            text = soup.get_text()
+
+            # Clean up text - remove multiple newlines and spaces
+            lines = (line.strip() for line in text.splitlines())
+            chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
+            text = '\n'.join(chunk for chunk in chunks if chunk)
+
+            # Truncate if too long
+            if len(text) > max_length:
+                logger.warning(f"Content length {len(text)} exceeds max {max_length}, truncating")
+                text = text[:max_length]
+
+            logger.info(f"Fetched {len(text)} characters of content")
+            return text
+
+        except Exception as e:
+            logger.error(f"Error fetching filing content: {e}")
+            return None
 
 
 def main():

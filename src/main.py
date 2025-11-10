@@ -17,6 +17,13 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from fetchers.sec_edgar import SECEdgarFetcher
 from fetchers.press_releases import PressReleaseFetcher
 
+try:
+    from summarizers.claude_summarizer import ClaudeSummarizer
+    SUMMARIZER_AVAILABLE = True
+except ImportError:
+    SUMMARIZER_AVAILABLE = False
+    logging.warning("Claude summarizer not available - install anthropic package")
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -41,6 +48,17 @@ class ServiceNowMonitor:
             "press_releases": [],
             "news_articles": []
         }
+
+        # Initialize summarizer if enabled and available
+        self.summarizer = None
+        if SUMMARIZER_AVAILABLE and self.config.get("claude", {}).get("enabled", False):
+            api_key = self.config.get("claude", {}).get("api_key") or os.environ.get("ANTHROPIC_API_KEY")
+            if api_key:
+                model = self.config.get("claude", {}).get("model", "claude-sonnet-4-5-20250929")
+                self.summarizer = ClaudeSummarizer(api_key=api_key, model=model)
+                logger.info("Claude summarizer initialized")
+            else:
+                logger.warning("Claude API key not found - summarization disabled")
 
     def _load_config(self, config_path: str = None) -> Dict:
         """Load configuration from YAML file."""
@@ -114,6 +132,30 @@ class ServiceNowMonitor:
 
         filings = fetcher.get_recent_filings(filing_types=filing_types, days_back=days_back)
 
+        # Add summarization if enabled
+        if self.summarizer and filings:
+            summarize_count = self.config.get("claude", {}).get("summarize_filings_count", 3)
+            logger.info(f"Summarizing top {summarize_count} filings...")
+
+            for i, filing in enumerate(filings[:summarize_count]):
+                logger.info(f"Fetching content for {filing['form_type']} from {filing['filing_date']}")
+
+                # Fetch filing content
+                content = fetcher.fetch_filing_content(filing['filing_url'])
+
+                if content:
+                    # Generate summary
+                    summary = self.summarizer.summarize(
+                        content=content,
+                        content_type=filing['form_type'],
+                        company_name=name
+                    )
+                    filing['summary'] = summary
+                    filing['content_fetched'] = True
+                else:
+                    filing['summary'] = "Unable to fetch filing content"
+                    filing['content_fetched'] = False
+
         self.results["sec_filings"] = filings
         return filings
 
@@ -137,6 +179,33 @@ class ServiceNowMonitor:
         fetcher = PressReleaseFetcher(company_name=company_name)
 
         releases = fetcher.get_recent_press_releases(days_back=days_back)
+
+        # Add summarization if enabled
+        if self.summarizer and releases:
+            summarize_count = self.config.get("claude", {}).get("summarize_releases_count", 5)
+            logger.info(f"Summarizing top {summarize_count} press releases...")
+
+            for i, release in enumerate(releases[:summarize_count]):
+                logger.info(f"Fetching content for press release: {release['title']}")
+
+                # Fetch press release content
+                content = fetcher.fetch_press_release_content(release['url'])
+
+                if content:
+                    # Generate summary
+                    content_type = "earnings" if release['category'] == "earnings" else "press_release"
+                    summary = self.summarizer.summarize(
+                        content=content,
+                        content_type=content_type,
+                        company_name=company_name
+                    )
+                    release['summary'] = summary
+                    release['content_fetched'] = True
+                else:
+                    # Use existing summary from RSS if available
+                    if not release.get('summary'):
+                        release['summary'] = "Unable to fetch press release content"
+                    release['content_fetched'] = False
 
         self.results["press_releases"] = releases
         return releases
@@ -175,7 +244,13 @@ class ServiceNowMonitor:
             for filing in self.results["sec_filings"][:5]:  # Show top 5
                 print(f"\n{filing['filing_date']} - {filing['form_type']}")
                 print(f"  {filing['description']}")
-                print(f"  {filing['filing_url']}")
+                if filing.get('summary'):
+                    print(f"\n  AI SUMMARY:")
+                    # Indent the summary
+                    for line in filing['summary'].split('\n'):
+                        if line.strip():
+                            print(f"  {line}")
+                print(f"\n  {filing['filing_url']}")
         else:
             print("No recent SEC filings found.")
 
@@ -186,7 +261,13 @@ class ServiceNowMonitor:
             for release in self.results["press_releases"][:5]:  # Show top 5
                 print(f"\n{release['date']} - {release['title']}")
                 print(f"  Category: {release['category']} | Source: {release['source']}")
-                print(f"  {release['url']}")
+                if release.get('summary'):
+                    print(f"\n  AI SUMMARY:")
+                    # Indent the summary
+                    for line in release['summary'].split('\n'):
+                        if line.strip():
+                            print(f"  {line}")
+                print(f"\n  {release['url']}")
         else:
             print("No recent press releases found.")
 

@@ -199,6 +199,48 @@ class PressReleaseFetcher:
         logger.info(f"Total unique press releases: {len(unique_releases)}")
         return unique_releases
 
+    def fetch_press_release_content(self, url: str, max_length: int = 50000) -> Optional[str]:
+        """
+        Fetch the actual content of a press release from its URL.
+
+        Args:
+            url: URL of the press release
+            max_length: Maximum length of content to return
+
+        Returns:
+            Text content of the press release, or None if fetch fails
+        """
+        try:
+            logger.info(f"Fetching press release content from {url}")
+            response = requests.get(url, headers=self.headers, timeout=15)
+            response.raise_for_status()
+
+            soup = BeautifulSoup(response.text, 'html.parser')
+
+            # Remove script and style elements
+            for script in soup(["script", "style"]):
+                script.decompose()
+
+            # Get text
+            text = soup.get_text()
+
+            # Clean up text
+            lines = (line.strip() for line in text.splitlines())
+            chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
+            text = '\n'.join(chunk for chunk in chunks if chunk)
+
+            # Truncate if too long
+            if len(text) > max_length:
+                logger.warning(f"Content length {len(text)} exceeds max {max_length}, truncating")
+                text = text[:max_length]
+
+            logger.info(f"Fetched {len(text)} characters of content")
+            return text
+
+        except Exception as e:
+            logger.error(f"Error fetching press release content: {e}")
+            return None
+
 
 def main():
     """Test the press release fetcher."""

@@ -4,10 +4,13 @@ A Python-based monitoring and summarization tool for staying aware of everything
 
 ## Features
 
-- **SEC Filings**: Automatically fetch and summarize 10-K and 10-Q reports
-- **News Monitoring**: Track news articles about ServiceNow from multiple sources
-- **Press Releases**: Monitor official ServiceNow press releases
-- **AI Summarization**: Leverage Claude AI to generate concise summaries
+- **SEC Filings**: Automatically fetch 10-K, 10-Q, and 8-K reports from SEC EDGAR
+- **Press Releases**: Monitor ServiceNow press releases from Business Wire and other sources
+- **AI Summarization**: Leverage Claude AI to generate intelligent, contextual summaries
+  - Earnings-specific analysis for financial results
+  - Strategic insights from 10-K/10-Q filings
+  - Concise summaries of press releases and announcements
+- **News Monitoring** (Coming soon): Track news articles about ServiceNow
 - **Internal Documents** (Coming soon): Monitor SharePoint and email attachments
 
 ## Project Structure
@@ -37,32 +40,44 @@ cd servicenow-monitor
 pip install -r requirements.txt
 ```
 
-3. Configure your settings:
+3. Set your Claude API key:
 ```bash
-cp config/config.yaml.example config/config.yaml
-# Edit config.yaml with your API keys and preferences
+export ANTHROPIC_API_KEY='your-api-key-here'
 ```
 
-4. Run the monitor:
+4. (Optional) Configure your settings:
+```bash
+cp config/config.yaml.example config/config.yaml
+# Edit config.yaml to customize behavior
+```
+
+5. Run the monitor:
 ```bash
 python src/main.py
 ```
 
 ## Configuration
 
-Create a `config/config.yaml` file with your settings:
-- Claude API key for summarization
-- News API credentials
-- Email settings for digest delivery
-- Microsoft Graph API credentials (for internal documents)
+The monitor works out-of-the-box with just the `ANTHROPIC_API_KEY` environment variable set.
+
+For advanced configuration, create a `config/config.yaml` file with:
+- **Claude AI**: API key, model selection, number of items to summarize
+- **Data Sources**: Enable/disable SEC filings, press releases, news
+- **Output Settings**: Email digest, HTML dashboard
+- **Microsoft Graph**: Credentials for internal document monitoring (future feature)
+
+See `config/config.yaml.example` for all available options.
 
 ## Development Roadmap
 
 - [x] Project structure
-- [ ] SEC EDGAR fetcher
-- [ ] News fetcher
-- [ ] Press release fetcher
-- [ ] Claude AI summarization
+- [x] SEC EDGAR fetcher (10-K, 10-Q, 8-K)
+- [x] Press release fetcher (Business Wire)
+- [x] Claude AI summarization
+  - [x] Context-aware prompts for different content types
+  - [x] Earnings-specific analysis
+  - [x] SEC filing analysis
+- [ ] News fetcher (NewsAPI integration)
 - [ ] Email digest generator
 - [ ] HTML dashboard
 - [ ] Microsoft Graph integration for internal docs
