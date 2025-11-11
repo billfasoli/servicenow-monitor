@@ -8,6 +8,7 @@ import os
 import sys
 import yaml
 import logging
+import argparse
 from datetime import datetime
 from typing import Dict, List
 
@@ -272,22 +273,41 @@ class ServiceNowMonitor:
         self.results["news_articles"] = articles
         return articles
 
-    def run(self):
-        """Run the complete monitoring cycle."""
+    def run(self, days_back: int = None, filings_days: int = None,
+            releases_days: int = None, articles_days: int = None):
+        """
+        Run the complete monitoring cycle.
+
+        Args:
+            days_back: Number of days to look back for all sources (overrides individual settings)
+            filings_days: Number of days to look back for SEC filings (default: 90)
+            releases_days: Number of days to look back for press releases (default: 60)
+            articles_days: Number of days to look back for news articles (default: 30)
+        """
+        # Apply universal days_back if provided
+        if days_back is not None:
+            filings_days = releases_days = articles_days = days_back
+
+        # Use defaults if not specified
+        filings_days = filings_days or 90
+        releases_days = releases_days or 60
+        articles_days = articles_days or 30
+
         logger.info("=" * 60)
         logger.info("ServiceNow Monitor - Starting")
         logger.info("=" * 60)
+        logger.info(f"Time periods: Filings={filings_days}d, Releases={releases_days}d, Articles={articles_days}d")
 
         # Fetch SEC filings
-        filings = self.fetch_sec_filings(days_back=90)
+        filings = self.fetch_sec_filings(days_back=filings_days)
         logger.info(f"Found {len(filings)} SEC filings")
 
         # Fetch press releases
-        releases = self.fetch_press_releases(days_back=60)
+        releases = self.fetch_press_releases(days_back=releases_days)
         logger.info(f"Found {len(releases)} press releases")
 
         # Fetch news articles
-        articles = self.fetch_news_articles(days_back=30)
+        articles = self.fetch_news_articles(days_back=articles_days)
         logger.info(f"Found {len(articles)} news articles")
 
         # Print summary
@@ -359,8 +379,85 @@ class ServiceNowMonitor:
 
 def main():
     """Main entry point."""
+    parser = argparse.ArgumentParser(
+        description='ServiceNow Monitor - Track SEC filings, press releases, and news articles',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Get updates from the last week
+  python src/main.py --period week
+
+  # Get updates from the last month
+  python src/main.py --period month
+
+  # Get updates from the last quarter (90 days)
+  python src/main.py --period quarter
+
+  # Custom: last 14 days
+  python src/main.py --days 14
+
+  # Custom periods for each source
+  python src/main.py --filings-days 30 --articles-days 7
+
+  # Default (no arguments): filings=90d, releases=60d, articles=30d
+  python src/main.py
+        """
+    )
+
+    parser.add_argument(
+        '--period',
+        choices=['week', 'month', 'quarter', 'year'],
+        help='Convenient time period presets (week=7d, month=30d, quarter=90d, year=365d)'
+    )
+
+    parser.add_argument(
+        '--days',
+        type=int,
+        help='Number of days to look back for all sources (overrides --period)'
+    )
+
+    parser.add_argument(
+        '--filings-days',
+        type=int,
+        help='Number of days to look back for SEC filings (default: 90)'
+    )
+
+    parser.add_argument(
+        '--releases-days',
+        type=int,
+        help='Number of days to look back for press releases (default: 60)'
+    )
+
+    parser.add_argument(
+        '--articles-days',
+        type=int,
+        help='Number of days to look back for news articles (default: 30)'
+    )
+
+    args = parser.parse_args()
+
+    # Convert period to days
+    period_map = {
+        'week': 7,
+        'month': 30,
+        'quarter': 90,
+        'year': 365
+    }
+
+    days_back = None
+    if args.period:
+        days_back = period_map[args.period]
+    elif args.days:
+        days_back = args.days
+
+    # Run the monitor
     monitor = ServiceNowMonitor()
-    monitor.run()
+    monitor.run(
+        days_back=days_back,
+        filings_days=args.filings_days,
+        releases_days=args.releases_days,
+        articles_days=args.articles_days
+    )
 
 
 if __name__ == "__main__":
