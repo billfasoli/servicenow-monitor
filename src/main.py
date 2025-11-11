@@ -18,6 +18,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from fetchers.sec_edgar import SECEdgarFetcher
 from fetchers.press_releases import PressReleaseFetcher
 from fetchers.news_articles import NewsArticleFetcher
+from secrets import SecretsManager
 
 try:
     from summarizers.claude_summarizer import ClaudeSummarizer
@@ -36,12 +37,13 @@ logger = logging.getLogger(__name__)
 class ServiceNowMonitor:
     """Main orchestrator for ServiceNow monitoring."""
 
-    def __init__(self, config_path: str = None):
+    def __init__(self, config_path: str = None, use_1password: bool = True):
         """
         Initialize the ServiceNow Monitor.
 
         Args:
             config_path: Path to the configuration file
+            use_1password: Whether to use 1Password CLI for secrets (default: True)
         """
         self.config = self._load_config(config_path)
         self.results = {
@@ -51,10 +53,22 @@ class ServiceNowMonitor:
             "news_articles": []
         }
 
+        # Initialize secrets manager
+        self.secrets_manager = SecretsManager(use_1password=use_1password)
+
         # Initialize summarizer if enabled and available
         self.summarizer = None
         if SUMMARIZER_AVAILABLE and self.config.get("claude", {}).get("enabled", False):
-            api_key = self.config.get("claude", {}).get("api_key") or os.environ.get("ANTHROPIC_API_KEY")
+            # Try to get API key from 1Password, then config, then env var
+            api_key = self.secrets_manager.get_secret(
+                secret_name="Claude API Key",
+                env_var_name="ANTHROPIC_API_KEY",
+                item_name="Anthropic API Key"
+            )
+
+            if not api_key:
+                api_key = self.config.get("claude", {}).get("api_key")
+
             if api_key:
                 model = self.config.get("claude", {}).get("model", "claude-sonnet-4-5-20250929")
                 self.summarizer = ClaudeSummarizer(api_key=api_key, model=model)
@@ -229,7 +243,16 @@ class ServiceNowMonitor:
         logger.info("Fetching news articles...")
 
         company_name = self.config.get("company", {}).get("name", "ServiceNow")
-        api_key = self.config.get("sources", {}).get("news", {}).get("api_key") or os.environ.get("NEWS_API_KEY")
+
+        # Try to get API key from 1Password, then config, then env var
+        api_key = self.secrets_manager.get_secret(
+            secret_name="NewsAPI Key",
+            env_var_name="NEWS_API_KEY",
+            item_name="NewsAPI"
+        )
+
+        if not api_key:
+            api_key = self.config.get("sources", {}).get("news", {}).get("api_key")
 
         if not api_key:
             logger.warning("NewsAPI key not found - news fetching disabled")
