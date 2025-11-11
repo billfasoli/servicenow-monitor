@@ -157,19 +157,45 @@ Open your browser to `http://localhost:5000`
 - Click links to read full content
 - See summary statistics at the top
 
-## Environment Variables
+## API Key Configuration
 
-**Required for AI summarization:**
+### Recommended: 1Password CLI (Most Secure) 🔒
+
+Store your API keys securely in 1Password:
+
+```bash
+# Sign in to 1Password
+eval $(op signin)
+
+# Store keys in 1Password app (one time):
+# - Create item: "Anthropic API Key"
+# - Create item: "NewsAPI"
+
+# Test retrieval
+python src/secrets.py
+
+# Run monitor (keys retrieved automatically)
+python src/main.py --period week
+```
+
+**Benefits:**
+- No secrets in code or shell history
+- Encrypted storage
+- Access control and audit trail
+- Easy key rotation
+
+See [1PASSWORD_SETUP.md](1PASSWORD_SETUP.md) for detailed setup.
+
+### Alternative: Environment Variables
+
 ```bash
 export ANTHROPIC_API_KEY='your-claude-api-key'
+export NEWS_API_KEY='your-newsapi-key'  # Optional
 ```
 
-**Optional for news monitoring:**
-```bash
-export NEWS_API_KEY='your-newsapi-key'
-```
-
-Get a free NewsAPI key at: https://newsapi.org/register
+Get keys:
+- Claude API: https://console.anthropic.com/
+- NewsAPI: https://newsapi.org/register (free)
 
 ## Configuration File
 
@@ -236,3 +262,74 @@ python src/main.py --help
 ```
 
 Shows all available options and examples.
+
+## Security Best Practices
+
+### API Key Management
+
+**✅ DO:**
+- Use 1Password CLI for secure storage
+- Keep 1Password session active while running
+- Rotate API keys periodically
+- Use separate keys for development/production
+
+**❌ DON'T:**
+- Commit API keys to git
+- Share keys in plain text (email, Slack, etc.)
+- Store keys in unencrypted config files
+- Use production keys in shared environments
+
+### Secret Retrieval Priority
+
+The monitor tries sources in this order:
+
+1. **1Password CLI** (most secure)
+   - Encrypted vault storage
+   - Access control
+   - Audit logging
+
+2. **Environment variables** (moderate security)
+   - Session-based
+   - Not persisted to disk
+   - Visible in process lists
+
+3. **Config file** (least secure)
+   - Only for testing
+   - Ensure `.gitignore` excludes config files
+   - Never commit real keys
+
+### Checking What Method Is Being Used
+
+Run with verbose logging to see where keys come from:
+
+```bash
+python src/main.py --period week 2>&1 | grep -i "retrieved"
+```
+
+You'll see output like:
+```
+INFO:__main__:Claude API Key: Retrieved from 1Password item 'Anthropic API Key'
+INFO:__main__:NewsAPI Key: Retrieved from environment variable NEWS_API_KEY
+```
+
+### Revoking Compromised Keys
+
+If a key is compromised:
+
+1. **Revoke immediately:**
+   - Anthropic: https://console.anthropic.com/settings/keys
+   - NewsAPI: https://newsapi.org/account
+
+2. **Generate new key**
+
+3. **Update in 1Password:**
+   ```bash
+   # Edit the item in 1Password app
+   # Or recreate via CLI:
+   op item delete "Anthropic API Key"
+   op item create --category="API Credential" \
+     --title="Anthropic API Key" \
+     credential="new-key-here"
+   ```
+
+4. **No code changes needed** - monitor automatically uses new key
