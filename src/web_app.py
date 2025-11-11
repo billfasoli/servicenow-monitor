@@ -24,7 +24,8 @@ app = Flask(__name__)
 cached_data = {
     "last_updated": None,
     "sec_filings": [],
-    "press_releases": []
+    "press_releases": [],
+    "news_articles": []
 }
 
 
@@ -33,7 +34,7 @@ def index():
     """Main dashboard page."""
     return render_template('index.html',
                          last_updated=cached_data.get('last_updated'),
-                         has_data=bool(cached_data.get('sec_filings') or cached_data.get('press_releases')))
+                         has_data=bool(cached_data.get('sec_filings') or cached_data.get('press_releases') or cached_data.get('news_articles')))
 
 
 @app.route('/api/refresh')
@@ -51,16 +52,20 @@ def refresh_data():
         # Fetch press releases
         releases = monitor.fetch_press_releases(days_back=60)
 
+        # Fetch news articles
+        articles = monitor.fetch_news_articles(days_back=30)
+
         # Update cache
         cached_data['sec_filings'] = filings
         cached_data['press_releases'] = releases
+        cached_data['news_articles'] = articles
         cached_data['last_updated'] = datetime.now().isoformat()
 
-        logger.info(f"Refresh complete: {len(filings)} filings, {len(releases)} releases")
+        logger.info(f"Refresh complete: {len(filings)} filings, {len(releases)} releases, {len(articles)} articles")
 
         return jsonify({
             'status': 'success',
-            'message': f'Fetched {len(filings)} filings and {len(releases)} press releases',
+            'message': f'Fetched {len(filings)} filings, {len(releases)} press releases, and {len(articles)} news articles',
             'last_updated': cached_data['last_updated']
         })
 
@@ -90,21 +95,34 @@ def get_releases():
     })
 
 
+@app.route('/api/articles')
+def get_articles():
+    """Get news articles data."""
+    return jsonify({
+        'articles': cached_data.get('news_articles', []),
+        'last_updated': cached_data.get('last_updated')
+    })
+
+
 @app.route('/api/summary')
 def get_summary():
     """Get summary statistics."""
     filings = cached_data.get('sec_filings', [])
     releases = cached_data.get('press_releases', [])
+    articles = cached_data.get('news_articles', [])
 
-    # Count filings with summaries
+    # Count items with summaries
     filings_with_summaries = sum(1 for f in filings if f.get('summary'))
     releases_with_summaries = sum(1 for r in releases if r.get('summary'))
+    articles_with_summaries = sum(1 for a in articles if a.get('summary'))
 
     return jsonify({
         'total_filings': len(filings),
         'total_releases': len(releases),
+        'total_articles': len(articles),
         'filings_with_summaries': filings_with_summaries,
         'releases_with_summaries': releases_with_summaries,
+        'articles_with_summaries': articles_with_summaries,
         'last_updated': cached_data.get('last_updated')
     })
 

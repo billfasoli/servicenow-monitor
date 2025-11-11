@@ -16,6 +16,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from fetchers.sec_edgar import SECEdgarFetcher
 from fetchers.press_releases import PressReleaseFetcher
+from fetchers.news_articles import NewsArticleFetcher
 
 try:
     from summarizers.claude_summarizer import ClaudeSummarizer
@@ -210,6 +211,67 @@ class ServiceNowMonitor:
         self.results["press_releases"] = releases
         return releases
 
+    def fetch_news_articles(self, days_back: int = 30) -> List[Dict]:
+        """
+        Fetch news articles.
+
+        Args:
+            days_back: Number of days to look back
+
+        Returns:
+            List of news article dictionaries
+        """
+        if not self.config.get("sources", {}).get("news", {}).get("enabled", False):
+            logger.info("News article fetching is disabled")
+            return []
+
+        logger.info("Fetching news articles...")
+
+        company_name = self.config.get("company", {}).get("name", "ServiceNow")
+        api_key = self.config.get("sources", {}).get("news", {}).get("api_key") or os.environ.get("NEWS_API_KEY")
+
+        if not api_key:
+            logger.warning("NewsAPI key not found - news fetching disabled")
+            return []
+
+        fetcher = NewsArticleFetcher(api_key=api_key, company_name=company_name)
+
+        # Get keywords from config
+        keywords = self.config.get("sources", {}).get("news", {}).get("keywords", [company_name])
+
+        articles = fetcher.get_recent_articles(
+            keywords=keywords,
+            days_back=days_back,
+            sort_by="publishedAt"
+        )
+
+        # Add summarization if enabled
+        if self.summarizer and articles:
+            summarize_count = self.config.get("claude", {}).get("summarize_articles_count", 5)
+            logger.info(f"Summarizing top {summarize_count} news articles...")
+
+            for i, article in enumerate(articles[:summarize_count]):
+                logger.info(f"Processing article: {article['title']}")
+
+                # Use description and content from NewsAPI
+                content = f"{article.get('description', '')}\n\n{article.get('content', '')}"
+
+                if content.strip():
+                    # Generate summary
+                    summary = self.summarizer.summarize(
+                        content=content,
+                        content_type="general",
+                        company_name=company_name
+                    )
+                    article['summary'] = summary
+                    article['content_fetched'] = True
+                else:
+                    article['summary'] = article.get('description', 'No summary available')
+                    article['content_fetched'] = False
+
+        self.results["news_articles"] = articles
+        return articles
+
     def run(self):
         """Run the complete monitoring cycle."""
         logger.info("=" * 60)
@@ -223,6 +285,10 @@ class ServiceNowMonitor:
         # Fetch press releases
         releases = self.fetch_press_releases(days_back=60)
         logger.info(f"Found {len(releases)} press releases")
+
+        # Fetch news articles
+        articles = self.fetch_news_articles(days_back=30)
+        logger.info(f"Found {len(articles)} news articles")
 
         # Print summary
         self.print_summary()
@@ -270,6 +336,23 @@ class ServiceNowMonitor:
                 print(f"\n  {release['url']}")
         else:
             print("No recent press releases found.")
+
+        # News Articles Summary
+        print("\n\n📰 NEWS ARTICLES")
+        print("-" * 60)
+        if self.results["news_articles"]:
+            for article in self.results["news_articles"][:5]:  # Show top 5
+                print(f"\n{article['date']} - {article['title']}")
+                print(f"  Source: {article['source']} | Author: {article['author']}")
+                if article.get('summary'):
+                    print(f"\n  AI SUMMARY:")
+                    # Indent the summary
+                    for line in article['summary'].split('\n'):
+                        if line.strip():
+                            print(f"  {line}")
+                print(f"\n  {article['url']}")
+        else:
+            print("No recent news articles found.")
 
         print("\n" + "=" * 60)
 

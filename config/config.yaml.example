@@ -9,6 +9,7 @@ claude:
   max_tokens: 1000
   summarize_filings_count: 3  # Number of most recent filings to summarize
   summarize_releases_count: 5  # Number of most recent press releases to summarize
+  summarize_articles_count: 5  # Number of most recent news articles to summarize
 
 # Company to monitor
 company:
@@ -23,9 +24,10 @@ sources:
     types: ["10-K", "10-Q", "8-K"]
 
   news:
-    enabled: true
-    # Get your API key from: https://newsapi.org/
-    api_key: "your-newsapi-key-here"
+    enabled: false  # Set to true and provide API key to enable news monitoring
+    # Get your FREE API key from: https://newsapi.org/register
+    # Can also use NEWS_API_KEY environment variable
+    api_key: ""
     keywords: ["ServiceNow", "NOW stock"]
 
   press_releases:

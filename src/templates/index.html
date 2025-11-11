@@ -5,35 +5,51 @@
     <div class="col-12">
         <!-- Summary Cards -->
         <div class="row mb-4">
-            <div class="col-md-3">
+            <div class="col-md-4 col-lg-2 mb-3">
                 <div class="card text-center">
                     <div class="card-body">
-                        <h5 class="card-title text-muted">SEC Filings</h5>
+                        <h5 class="card-title text-muted small">SEC Filings</h5>
                         <h2 class="card-text" id="total-filings">-</h2>
                     </div>
                 </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-4 col-lg-2 mb-3">
                 <div class="card text-center">
                     <div class="card-body">
-                        <h5 class="card-title text-muted">Press Releases</h5>
+                        <h5 class="card-title text-muted small">Press Releases</h5>
                         <h2 class="card-text" id="total-releases">-</h2>
                     </div>
                 </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-4 col-lg-2 mb-3">
                 <div class="card text-center">
                     <div class="card-body">
-                        <h5 class="card-title text-muted">AI Summaries (Filings)</h5>
+                        <h5 class="card-title text-muted small">News Articles</h5>
+                        <h2 class="card-text" id="total-articles">-</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 col-lg-2 mb-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h5 class="card-title text-muted small">Summaries (Filings)</h5>
                         <h2 class="card-text" id="filings-summaries">-</h2>
                     </div>
                 </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-4 col-lg-2 mb-3">
                 <div class="card text-center">
                     <div class="card-body">
-                        <h5 class="card-title text-muted">AI Summaries (Releases)</h5>
+                        <h5 class="card-title text-muted small">Summaries (Releases)</h5>
                         <h2 class="card-text" id="releases-summaries">-</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 col-lg-2 mb-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h5 class="card-title text-muted small">Summaries (Articles)</h5>
+                        <h2 class="card-text" id="articles-summaries">-</h2>
                     </div>
                 </div>
             </div>
@@ -66,6 +82,11 @@
                     <i class="bi bi-newspaper"></i> Press Releases
                 </button>
             </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="articles-tab" data-bs-toggle="tab" data-bs-target="#articles" type="button">
+                    <i class="bi bi-globe"></i> News Articles
+                </button>
+            </li>
         </ul>
 
         <!-- Tab Content -->
@@ -79,6 +100,11 @@
             <div class="tab-pane fade" id="releases" role="tabpanel">
                 <div id="releases-container"></div>
             </div>
+
+            <!-- News Articles Tab -->
+            <div class="tab-pane fade" id="articles" role="tabpanel">
+                <div id="articles-container"></div>
+            </div>
         </div>
     </div>
 </div>
@@ -91,6 +117,7 @@
         loadSummary();
         loadFilings();
         loadReleases();
+        loadArticles();
     });
 
     function refreshData() {
@@ -104,6 +131,7 @@
                     loadSummary();
                     loadFilings();
                     loadReleases();
+                    loadArticles();
 
                     // Show success message
                     showAlert('success', data.message);
@@ -125,8 +153,10 @@
             .then(data => {
                 document.getElementById('total-filings').textContent = data.total_filings;
                 document.getElementById('total-releases').textContent = data.total_releases;
+                document.getElementById('total-articles').textContent = data.total_articles;
                 document.getElementById('filings-summaries').textContent = data.filings_with_summaries;
                 document.getElementById('releases-summaries').textContent = data.releases_with_summaries;
+                document.getElementById('articles-summaries').textContent = data.articles_with_summaries;
             });
     }
 
@@ -163,6 +193,25 @@
 
                 data.releases.forEach(release => {
                     const card = createReleaseCard(release);
+                    container.appendChild(card);
+                });
+            });
+    }
+
+    function loadArticles() {
+        fetch('/api/articles')
+            .then(response => response.json())
+            .then(data => {
+                const container = document.getElementById('articles-container');
+                container.innerHTML = '';
+
+                if (data.articles.length === 0) {
+                    container.innerHTML = '<p class="text-muted">No news articles available</p>';
+                    return;
+                }
+
+                data.articles.forEach(article => {
+                    const card = createArticleCard(article);
                     container.appendChild(card);
                 });
             });
@@ -236,6 +285,51 @@
                 ${summaryHtml}
                 <a href="${release.url}" target="_blank" class="btn btn-primary btn-sm mt-2">
                     <i class="bi bi-box-arrow-up-right"></i> Read Release
+                </a>
+            </div>
+        `;
+
+        return card;
+    }
+
+    function createArticleCard(article) {
+        const card = document.createElement('div');
+        card.className = 'card mb-3';
+
+        let summaryHtml = '';
+        if (article.summary) {
+            summaryHtml = `
+                <div class="mt-3">
+                    <h6><i class="bi bi-stars"></i> AI Summary:</h6>
+                    <div class="alert alert-light summary-content">
+                        ${formatSummary(article.summary)}
+                    </div>
+                </div>
+            `;
+        }
+
+        // Display image if available
+        let imageHtml = '';
+        if (article.url_to_image) {
+            imageHtml = `<img src="${article.url_to_image}" class="card-img-top" alt="${article.title}" style="max-height: 300px; object-fit: cover;">`;
+        }
+
+        card.innerHTML = `
+            ${imageHtml}
+            <div class="card-body">
+                <h5 class="card-title">
+                    <span class="badge bg-primary">News</span>
+                    ${article.title}
+                </h5>
+                <h6 class="card-subtitle mb-2 text-muted">
+                    <i class="bi bi-calendar"></i> ${article.date} |
+                    <i class="bi bi-newspaper"></i> ${article.source} |
+                    <i class="bi bi-person"></i> ${article.author}
+                </h6>
+                ${article.description ? '<p class="card-text">' + article.description + '</p>' : ''}
+                ${summaryHtml}
+                <a href="${article.url}" target="_blank" class="btn btn-primary btn-sm mt-2">
+                    <i class="bi bi-box-arrow-up-right"></i> Read Article
                 </a>
             </div>
         `;
