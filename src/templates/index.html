@@ -1,0 +1,280 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <!-- Summary Cards -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h5 class="card-title text-muted">SEC Filings</h5>
+                        <h2 class="card-text" id="total-filings">-</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h5 class="card-title text-muted">Press Releases</h5>
+                        <h2 class="card-text" id="total-releases">-</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h5 class="card-title text-muted">AI Summaries (Filings)</h5>
+                        <h2 class="card-text" id="filings-summaries">-</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h5 class="card-title text-muted">AI Summaries (Releases)</h5>
+                        <h2 class="card-text" id="releases-summaries">-</h2>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% if not has_data %}
+        <div class="alert alert-info text-center" role="alert">
+            <i class="bi bi-info-circle"></i>
+            No data loaded yet. Click <strong>Refresh</strong> to fetch the latest information.
+        </div>
+        {% endif %}
+
+        <!-- Loading Spinner -->
+        <div id="loading-spinner" class="text-center my-5" style="display: none;">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-3">Fetching data and generating summaries...</p>
+        </div>
+
+        <!-- Tabs -->
+        <ul class="nav nav-tabs mb-3" id="mainTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="filings-tab" data-bs-toggle="tab" data-bs-target="#filings" type="button">
+                    <i class="bi bi-file-earmark-text"></i> SEC Filings
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="releases-tab" data-bs-toggle="tab" data-bs-target="#releases" type="button">
+                    <i class="bi bi-newspaper"></i> Press Releases
+                </button>
+            </li>
+        </ul>
+
+        <!-- Tab Content -->
+        <div class="tab-content" id="mainTabContent">
+            <!-- SEC Filings Tab -->
+            <div class="tab-pane fade show active" id="filings" role="tabpanel">
+                <div id="filings-container"></div>
+            </div>
+
+            <!-- Press Releases Tab -->
+            <div class="tab-pane fade" id="releases" role="tabpanel">
+                <div id="releases-container"></div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Load data on page load
+    window.addEventListener('DOMContentLoaded', function() {
+        loadSummary();
+        loadFilings();
+        loadReleases();
+    });
+
+    function refreshData() {
+        document.getElementById('loading-spinner').style.display = 'block';
+
+        fetch('/api/refresh')
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    document.getElementById('last-updated').textContent = 'Last updated: ' + new Date(data.last_updated).toLocaleString();
+                    loadSummary();
+                    loadFilings();
+                    loadReleases();
+
+                    // Show success message
+                    showAlert('success', data.message);
+                } else {
+                    showAlert('danger', 'Error: ' + data.message);
+                }
+            })
+            .catch(error => {
+                showAlert('danger', 'Error refreshing data: ' + error);
+            })
+            .finally(() => {
+                document.getElementById('loading-spinner').style.display = 'none';
+            });
+    }
+
+    function loadSummary() {
+        fetch('/api/summary')
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('total-filings').textContent = data.total_filings;
+                document.getElementById('total-releases').textContent = data.total_releases;
+                document.getElementById('filings-summaries').textContent = data.filings_with_summaries;
+                document.getElementById('releases-summaries').textContent = data.releases_with_summaries;
+            });
+    }
+
+    function loadFilings() {
+        fetch('/api/filings')
+            .then(response => response.json())
+            .then(data => {
+                const container = document.getElementById('filings-container');
+                container.innerHTML = '';
+
+                if (data.filings.length === 0) {
+                    container.innerHTML = '<p class="text-muted">No filings available</p>';
+                    return;
+                }
+
+                data.filings.forEach(filing => {
+                    const card = createFilingCard(filing);
+                    container.appendChild(card);
+                });
+            });
+    }
+
+    function loadReleases() {
+        fetch('/api/releases')
+            .then(response => response.json())
+            .then(data => {
+                const container = document.getElementById('releases-container');
+                container.innerHTML = '';
+
+                if (data.releases.length === 0) {
+                    container.innerHTML = '<p class="text-muted">No press releases available</p>';
+                    return;
+                }
+
+                data.releases.forEach(release => {
+                    const card = createReleaseCard(release);
+                    container.appendChild(card);
+                });
+            });
+    }
+
+    function createFilingCard(filing) {
+        const card = document.createElement('div');
+        card.className = 'card mb-3';
+
+        const badge = getBadgeClass(filing.form_type);
+
+        let summaryHtml = '';
+        if (filing.summary) {
+            summaryHtml = `
+                <div class="mt-3">
+                    <h6><i class="bi bi-stars"></i> AI Summary:</h6>
+                    <div class="alert alert-light summary-content">
+                        ${formatSummary(filing.summary)}
+                    </div>
+                </div>
+            `;
+        }
+
+        card.innerHTML = `
+            <div class="card-body">
+                <h5 class="card-title">
+                    <span class="badge ${badge}">${filing.form_type}</span>
+                    ${filing.description || filing.form_type + ' Filing'}
+                </h5>
+                <h6 class="card-subtitle mb-2 text-muted">
+                    <i class="bi bi-calendar"></i> ${filing.filing_date}
+                </h6>
+                ${summaryHtml}
+                <a href="${filing.filing_url}" target="_blank" class="btn btn-primary btn-sm mt-2">
+                    <i class="bi bi-box-arrow-up-right"></i> View Filing
+                </a>
+            </div>
+        `;
+
+        return card;
+    }
+
+    function createReleaseCard(release) {
+        const card = document.createElement('div');
+        card.className = 'card mb-3';
+
+        const categoryBadge = release.category === 'earnings' ? 'bg-success' : 'bg-info';
+
+        let summaryHtml = '';
+        if (release.summary) {
+            summaryHtml = `
+                <div class="mt-3">
+                    <h6><i class="bi bi-stars"></i> AI Summary:</h6>
+                    <div class="alert alert-light summary-content">
+                        ${formatSummary(release.summary)}
+                    </div>
+                </div>
+            `;
+        }
+
+        card.innerHTML = `
+            <div class="card-body">
+                <h5 class="card-title">
+                    <span class="badge ${categoryBadge}">${release.category}</span>
+                    ${release.title}
+                </h5>
+                <h6 class="card-subtitle mb-2 text-muted">
+                    <i class="bi bi-calendar"></i> ${release.date} |
+                    <i class="bi bi-building"></i> ${release.source}
+                </h6>
+                ${summaryHtml}
+                <a href="${release.url}" target="_blank" class="btn btn-primary btn-sm mt-2">
+                    <i class="bi bi-box-arrow-up-right"></i> Read Release
+                </a>
+            </div>
+        `;
+
+        return card;
+    }
+
+    function getBadgeClass(formType) {
+        switch(formType) {
+            case '10-K': return 'bg-danger';
+            case '10-Q': return 'bg-warning';
+            case '8-K': return 'bg-info';
+            default: return 'bg-secondary';
+        }
+    }
+
+    function formatSummary(summary) {
+        // Convert bullet points to HTML list
+        return summary.replace(/^[-•]\s*/gm, '<li>').split('\n').map(line => {
+            if (line.startsWith('<li>')) {
+                return line;
+            }
+            return line ? '<p>' + line + '</p>' : '';
+        }).join('');
+    }
+
+    function showAlert(type, message) {
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-3`;
+        alertDiv.style.zIndex = '9999';
+        alertDiv.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        document.body.appendChild(alertDiv);
+
+        setTimeout(() => {
+            alertDiv.remove();
+        }, 5000);
+    }
+</script>
+{% endblock %}

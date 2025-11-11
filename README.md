@@ -19,10 +19,13 @@ A Python-based monitoring and summarization tool for staying aware of everything
 servicenow-monitor/
 ├── config/          # Configuration files
 ├── src/
-│   ├── fetchers/    # Data fetching modules (SEC, news, etc.)
+│   ├── fetchers/    # Data fetching modules (SEC, press releases, etc.)
 │   ├── summarizers/ # AI summarization using Claude
 │   ├── outputs/     # Output generators (email, HTML, etc.)
-│   └── main.py      # Main orchestrator
+│   ├── templates/   # Flask HTML templates
+│   ├── static/      # CSS, JS, images for web dashboard
+│   ├── main.py      # CLI orchestrator
+│   └── web_app.py   # Flask web dashboard
 ├── data/            # Local data storage
 └── tests/           # Unit tests
 ```
@@ -52,9 +55,35 @@ cp config/config.yaml.example config/config.yaml
 ```
 
 5. Run the monitor:
+
+**Command Line (CLI)**:
 ```bash
 python src/main.py
 ```
+
+**Web Dashboard**:
+```bash
+python src/web_app.py
+```
+Then open your browser to `http://localhost:5000`
+
+## Web Dashboard
+
+The Flask-based web dashboard provides an interactive interface to view and manage your ServiceNow monitoring data.
+
+**Features:**
+- Real-time data refresh with a single click
+- Summary statistics for filings and press releases
+- Tabbed interface for easy navigation
+- AI-generated summaries displayed inline
+- Responsive design that works on mobile and desktop
+- Direct links to original SEC filings and press releases
+
+**Screenshots:**
+- View all SEC filings (10-K, 10-Q, 8-K) with color-coded badges
+- See press releases categorized as earnings or general news
+- AI summaries displayed in an easy-to-read format
+- One-click refresh to fetch the latest data
 
 ## Configuration
 
@@ -77,9 +106,13 @@ See `config/config.yaml.example` for all available options.
   - [x] Context-aware prompts for different content types
   - [x] Earnings-specific analysis
   - [x] SEC filing analysis
+- [x] Flask web dashboard
+  - [x] Interactive UI with Bootstrap
+  - [x] Real-time data refresh
+  - [x] Summary statistics
+  - [x] Tabbed interface for filings and releases
 - [ ] News fetcher (NewsAPI integration)
 - [ ] Email digest generator
-- [ ] HTML dashboard
 - [ ] Microsoft Graph integration for internal docs
 - [ ] Scheduling and automation
 

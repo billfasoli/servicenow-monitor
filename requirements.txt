@@ -14,6 +14,9 @@ lxml>=4.9.0
 # Date/time handling
 python-dateutil>=2.8.2
 
+# Web Framework
+flask>=3.0.0
+
 # Email
 smtplib2>=0.1.0
 
